@@ -4,7 +4,7 @@
 # 1. Reads mapping
 # ==============================================================================
 
-## 1.1 LRS data
+## 1.1 LRS data (Zhengzhou cohort)
 meryl count k=15 output merylDB ${hg38_ref_genome}
 meryl print greater-than distinct=0.9998 merylDB > repetitive_k15.txt
 
@@ -12,12 +12,12 @@ winnowmap -W repetitive_k15.txt -L --cs --MD -t ${threads} -ax map-ont \
   ${hg38_ref_genome} ${sample}.fq.gz > ${sample}.sam
 
 ## 1.2 SRS data
-### 1.2.1 Zhongyuan cohort
-bwa-mem2 mem -t ${threads} -B 4 -O 6 -E 1 -M -R ${read_group_tag} \
+### 1.2.1 Zhengzhou cohort
+bwa-mem2 mem -t ${threads} -M -R ${read_group_tag} \
   ${hg38_ref_genome} ${sample}_R1.fastq.gz ${sample}_R2.fastq.gz > ${sample}.sam
 
-### 1.2.2 Independent Han Chinese cohort
-bwa mem -t ${threads} -B 4 -O 6 -E 1 -M -R ${read_group_tag} \
+### 1.2.2 Shanghai cohort
+bwa mem -t ${threads} -M -R ${read_group_tag} \
   ${hg38_ref_genome} ${sample}_R1.fastq.gz ${sample}_R2.fastq.gz > ${sample}.sam
 
 
@@ -215,14 +215,14 @@ shapeit4 \
 tabix -p vcf -f ${pop}.${chr}.phased.vcf.gz
 
 ## 4.3 Genetic map interpolation (PLINK)
-plink --vcf ${pop}.${chr}.phased.vcf.gz --make-bed --out ${pop}.${chr}
+plink --vcf ${pop}.${chr}.filtered.maf0.05.phased.vcf.gz --make-bed --out ${pop}.${chr}
 plink --bfile ${pop}.${chr} --cm-map ${plink_grch38_genetic_map} ${chr_num} --make-bed --out ${pop}.${chr}.withcm
 cut -f 1-4 ${pop}.${chr}.withcm.bim > ${pop}.${chr}.withcm.map
 
 ## 4.4 iHS calculation and normalization (selscan)
 selscan --ihs \
   --threads ${threads} \
-  --vcf ${pop}.${chr}.phased.vcf.gz \
+  --vcf ${pop}.${chr}.filtered.maf0.05.phased.vcf.gz \
   --map ${pop}.${chr}.withcm.map \
   --out ${pop}.${chr}
 
@@ -270,7 +270,7 @@ Minimac3 \
 
 
 # ==============================================================================
-# 7. Imputation to the independent Han Chinese cohort
+# 7. Imputation to the independent Shanghai cohort
 # ==============================================================================
 
 ## 7.1 Target cohort phasing (Eagle)
@@ -287,12 +287,13 @@ minimac4 \
   --haps ${target_phased}.${chr}.vcf.gz \
   --chr ${chr} \
   --format GT,DS \
+  --min-r2 0.75 \
   --allTypedSites \
   --prefix ${target_imputed}.${chr}
 
 ## 7.3 Post-imputation quality control (BCFtools)
 bcftools view \
-  -i 'R2>=0.75 && MAF>=0.01' \
+  -i 'MAF>=0.01' \
   -O z \
   -o ${target_imputed_qc}.${chr}.vcf.gz \
   ${target_imputed}.${chr}.dose.vcf.gz
